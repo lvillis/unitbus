@@ -83,7 +83,11 @@ fn query_sdjournal_sync(
     if let Some(unit) = &unit {
         q.or_group(|g| {
             g.match_exact("_SYSTEMD_UNIT", unit.as_bytes());
+        });
+        q.or_group(|g| {
             g.match_exact("UNIT", unit.as_bytes());
+        });
+        q.or_group(|g| {
             g.match_exact("OBJECT_SYSTEMD_UNIT", unit.as_bytes());
         });
     }
