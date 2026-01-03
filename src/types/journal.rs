@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, time::SystemTime};
 
 pub type JournalCursor = String;
 
-/// How to handle malformed JSON lines from journalctl.
+/// How to handle malformed journal entries from the configured backend.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 #[non_exhaustive]
 pub enum ParseErrorMode {

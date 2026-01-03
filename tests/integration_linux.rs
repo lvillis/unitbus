@@ -17,7 +17,10 @@ fn env(name: &str) -> Option<String> {
     }
 }
 
-#[cfg(all(feature = "tasks", feature = "journal-cli"))]
+#[cfg(all(
+    feature = "tasks",
+    any(feature = "journal-cli", feature = "journal-sdjournal")
+))]
 fn find_executable(candidates: &[&str]) -> Option<String> {
     for c in candidates {
         if std::path::Path::new(c).exists() {
@@ -48,7 +51,10 @@ fn restart_and_wait() {
     .unwrap();
 }
 
-#[cfg(all(feature = "tasks", feature = "journal-cli"))]
+#[cfg(all(
+    feature = "tasks",
+    any(feature = "journal-cli", feature = "journal-sdjournal")
+))]
 #[test]
 #[ignore]
 fn run_task_echo_and_fetch_logs() {
@@ -108,7 +114,10 @@ fn run_task_echo_and_fetch_logs() {
     .unwrap();
 }
 
-#[cfg(all(feature = "tasks", feature = "journal-cli"))]
+#[cfg(all(
+    feature = "tasks",
+    any(feature = "journal-cli", feature = "journal-sdjournal")
+))]
 #[test]
 #[ignore]
 fn run_task_failure_can_diagnose() {

@@ -5,7 +5,7 @@ pub(crate) async fn probe(bus: &crate::UnitBus) -> Capabilities {
     let can_control_units = probe_control_units(bus).await;
 
     let can_read_journal = {
-        #[cfg(feature = "journal-cli")]
+        #[cfg(any(feature = "journal-cli", feature = "journal-sdjournal"))]
         {
             let filter = crate::types::journal::JournalFilter {
                 limit: 1,
@@ -14,7 +14,7 @@ pub(crate) async fn probe(bus: &crate::UnitBus) -> Capabilities {
             bus.journal().query(filter).await.is_ok()
         }
 
-        #[cfg(not(feature = "journal-cli"))]
+        #[cfg(not(any(feature = "journal-cli", feature = "journal-sdjournal")))]
         {
             false
         }

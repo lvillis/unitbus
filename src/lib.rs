@@ -1,5 +1,5 @@
 //! unitbus is a Rust SDK for Linux systemd: control units/jobs via the system D-Bus (systemctl-like),
-//! run one-shot transient tasks, and query journald logs via `journalctl --output=json`.
+//! run one-shot transient tasks, and query journald logs (default: pure Rust backend).
 //!
 //! It is designed as a control-plane foundation for traditional deployments (non-Kubernetes) and
 //! CD/agent tooling.
@@ -26,10 +26,13 @@
 //! - Names containing path separators or control characters are rejected as `Error::InvalidInput`.
 //!
 //! ## Journald limits
-//! The default journald backend uses `journalctl --output=json` and enforces bounded results:
+//! The journald backend enforces bounded results:
 //! - `limit` (default: 200)
 //! - `max_bytes` (default: 1 MiB)
 //! - `max_message_bytes` (default: 16 KiB)
+//!
+//! Default backend: pure Rust journal reader (feature=`journal-sdjournal`).
+//! Alternative backend: `journalctl --output=json` (feature=`journal-cli`).
 //!
 //! When limits are exceeded, the returned `JournalResult.truncated` is set to `true`.
 

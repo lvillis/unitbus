@@ -12,7 +12,10 @@ impl Journal {
         Self { inner }
     }
 
-    /// Query journald logs using the configured backend (default: `journalctl --output=json`).
+    /// Query journald logs using the configured backend.
+    ///
+    /// Default backend: `sdjournal` (feature=`journal-sdjournal`).
+    /// Alternative backend: `journalctl --output=json` (feature=`journal-cli`).
     ///
     /// The result is always bounded by `filter.limit` and `filter.max_bytes`. When limits are hit,
     /// `JournalResult.truncated` is set to `true`.
@@ -25,12 +28,18 @@ impl Journal {
             return crate::journal::cli::query_journalctl(&self.inner.opts, filter).await;
         }
 
-        #[cfg(not(feature = "journal-cli"))]
+        #[cfg(all(not(feature = "journal-cli"), feature = "journal-sdjournal"))]
+        {
+            return crate::journal::sdjournal::query_sdjournal(&self.inner.opts, filter).await;
+        }
+
+        #[cfg(all(not(feature = "journal-cli"), not(feature = "journal-sdjournal")))]
         {
             let _ = filter;
             return Err(crate::Error::BackendUnavailable {
-                backend: "journalctl",
-                detail: "feature journal-cli is disabled".to_string(),
+                backend: "journald",
+                detail: "no journald backend enabled (enable journal-cli or journal-sdjournal)"
+                    .to_string(),
             });
         }
     }
@@ -88,3 +97,6 @@ impl Journal {
 
 #[cfg(feature = "journal-cli")]
 mod cli;
+
+#[cfg(all(feature = "journal-sdjournal", not(feature = "journal-cli")))]
+mod sdjournal;

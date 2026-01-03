@@ -7,7 +7,7 @@ pub struct UnitBusOptions {
     /// D-Bus method call timeout.
     pub dbus_call_timeout: Duration,
 
-    /// Default process-level timeout for `journalctl` calls when not specified in the filter.
+    /// Default timeout for journald queries when not specified in the filter.
     pub journal_default_timeout: Duration,
 
     /// Initial polling interval for job wait fallback.

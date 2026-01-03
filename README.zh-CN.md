@@ -4,7 +4,7 @@
 [![docs.rs](https://docs.rs/unitbus/badge.svg)](https://docs.rs/unitbus)
 [![CI](https://github.com/lvillis/unitbus/actions/workflows/ci.yml/badge.svg)](https://github.com/lvillis/unitbus/actions/workflows/ci.yml)
 
-面向 **Linux systemd** 的 Rust SDK：通过 **system D-Bus** 以类似 `systemctl` 的方式控制 **unit/job**，执行 **transient oneshot 任务**，并通过 `journalctl --output=json` 结构化读取 **journald** 日志。
+面向 **Linux systemd** 的 Rust SDK：通过 **system D-Bus** 以类似 `systemctl` 的方式控制 **unit/job**，执行 **transient oneshot 任务**，并结构化读取 **journald** 日志（默认纯 Rust 后端）。
 
 运行时仅支持 Linux（需要 systemd + system bus）。本 crate 设计为可在其他平台编译，但大多数操作会返回 `Error::BackendUnavailable`。
 
@@ -17,14 +17,17 @@
 ## 环境要求
 
 - system bus 上存在 systemd（`org.freedesktop.systemd1`）
-- 可通过 `journalctl` 访问 journald（默认后端，feature=`journal-cli`）
+- journald 后端：
+  - 默认：纯 Rust 读取 journal 文件（feature=`journal-sdjournal`）
+  - 可选：`journalctl` JSON 后端（feature=`journal-cli`）
 - 权限：
   - 控制 unit（start/stop/restart/reload）通常需要 root 或 PolicyKit 授权
   - 读取日志可能需要 root 或加入 `systemd-journal` 组
 
 ## Features
 
-- 默认：`journal-cli`（通过 `journalctl` 读取 journald）
+- 默认：`journal-sdjournal`（纯 Rust journald 后端，不依赖 `journalctl` 子进程）
+- 可选：`journal-cli`（通过 `journalctl --output=json` 读取 journald）
 - 可选：`config`（drop-in 配置管理）
 - 可选：`tasks`（通过 `StartTransientUnit` 执行 transient task）
 - 可选：`tracing`（通过 `tracing` 增强可观测性）
@@ -35,7 +38,14 @@
 
 ```toml
 [dependencies]
-unitbus = "0.1.0"
+unitbus = "0.1"
+```
+
+使用 `journalctl` JSON 后端：
+
+```toml
+[dependencies]
+unitbus = { version = "0.1", default-features = false, features = ["journal-cli"] }
 ```
 
 ## 快速开始

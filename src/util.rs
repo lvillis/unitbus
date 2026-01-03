@@ -1,6 +1,6 @@
 use crate::{Error, Result};
 
-#[cfg(feature = "journal-cli")]
+#[cfg(any(feature = "journal-cli", feature = "journal-sdjournal"))]
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 pub(crate) fn canonicalize_unit_name(input: &str) -> Result<String> {
@@ -88,7 +88,17 @@ pub(crate) fn unix_seconds(t: SystemTime) -> Result<i64> {
     })
 }
 
-#[cfg(feature = "journal-cli")]
+#[cfg(all(feature = "journal-sdjournal", not(feature = "journal-cli")))]
+pub(crate) fn unix_micros(t: SystemTime) -> Result<u64> {
+    let dur = t.duration_since(UNIX_EPOCH).map_err(|e| Error::IoError {
+        context: format!("system time before unix epoch: {e}"),
+    })?;
+    u64::try_from(dur.as_micros()).map_err(|e| Error::IoError {
+        context: format!("unix micros overflow: {e}"),
+    })
+}
+
+#[cfg(any(feature = "journal-cli", feature = "journal-sdjournal"))]
 pub(crate) fn system_time_from_unix_micros(us: u64) -> SystemTime {
     UNIX_EPOCH + Duration::from_micros(us)
 }

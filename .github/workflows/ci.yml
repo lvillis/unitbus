@@ -33,6 +33,8 @@ jobs:
         args:
           - ""
           - "--no-default-features"
+          - "--no-default-features --features journal-cli"
+          - "--no-default-features --features journal-sdjournal"
           - "--features config"
           - "--features tasks"
           - "--all-features"

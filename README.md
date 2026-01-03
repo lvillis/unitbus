@@ -6,7 +6,7 @@
 
 [中文版本](README.zh-CN.md)
 
-Rust SDK for **Linux systemd**: control **units/jobs** over the **system D-Bus** (systemctl-like), run **transient one-shot tasks**, and query **journald** logs via `journalctl --output=json`.
+Rust SDK for **Linux systemd**: control **units/jobs** over the **system D-Bus** (systemctl-like), run **transient one-shot tasks**, and query **journald** logs (default: pure Rust backend; optional: `journalctl --output=json`).
 
 Runtime is Linux-only (systemd + system bus required). The crate is designed to compile on other
 platforms, but most operations will fail with `Error::BackendUnavailable`.
@@ -20,14 +20,17 @@ platforms, but most operations will fail with `Error::BackendUnavailable`.
 ## Requirements
 
 - systemd on the system bus (`org.freedesktop.systemd1`)
-- journald access via `journalctl` (default backend, feature=`journal-cli`)
+- journald backend:
+  - default: pure Rust journal reader (feature=`journal-sdjournal`)
+  - optional: `journalctl` JSON backend (feature=`journal-cli`)
 - Permissions:
   - Unit control typically requires root or PolicyKit authorization.
   - Reading logs via `journalctl` may require root or `systemd-journal` group membership.
 
 ## Features
 
-- Default: `journal-cli` (journald via `journalctl`)
+- Default: `journal-sdjournal` (pure Rust journald backend, no `journalctl` subprocess)
+- Optional: `journal-cli` (journald via `journalctl --output=json`)
 - Optional: `config` (drop-in management)
 - Optional: `tasks` (transient tasks via `StartTransientUnit`)
 - Optional: `tracing` (instrumentation via `tracing`)
@@ -38,7 +41,14 @@ platforms, but most operations will fail with `Error::BackendUnavailable`.
 
 ```toml
 [dependencies]
-unitbus = "0.1.0"
+unitbus = "0.1"
+```
+
+To use the `journalctl` backend (JSON):
+
+```toml
+[dependencies]
+unitbus = { version = "0.1", default-features = false, features = ["journal-cli"] }
 ```
 
 ## Quick start
