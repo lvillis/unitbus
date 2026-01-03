@@ -44,6 +44,14 @@
 #![deny(clippy::unimplemented)]
 #![deny(clippy::dbg_macro)]
 
+#[cfg(all(feature = "rt-async-io", feature = "rt-tokio"))]
+compile_error!("features `rt-async-io` and `rt-tokio` are mutually exclusive; enable exactly one.");
+
+#[cfg(not(any(feature = "rt-async-io", feature = "rt-tokio")))]
+compile_error!(
+    "missing runtime feature: enable one of `rt-async-io` or `rt-tokio` (default enables `rt-async-io`)."
+);
+
 #[cfg(feature = "blocking")]
 mod blocking_api;
 mod bus;
@@ -55,6 +63,7 @@ mod journal;
 #[cfg(feature = "observe")]
 mod observe;
 mod options;
+mod runtime;
 mod types;
 mod units;
 mod util;

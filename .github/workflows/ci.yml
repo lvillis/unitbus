@@ -17,13 +17,19 @@ jobs:
 
   clippy:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        args:
+          - "--no-default-features --features rt-async-io,journal-sdjournal,journal-cli,config,tasks,observe,blocking,tracing"
+          - "--no-default-features --features rt-tokio,journal-sdjournal,journal-cli,config,tasks,observe,blocking,tracing"
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.92.0
           components: clippy
-      - run: cargo clippy --all-targets --all-features -- -D warnings
+      - run: cargo clippy --all-targets ${{ matrix.args }} -- -D warnings
 
   test:
     runs-on: ubuntu-latest
@@ -32,12 +38,18 @@ jobs:
       matrix:
         args:
           - ""
-          - "--no-default-features"
-          - "--no-default-features --features journal-cli"
-          - "--no-default-features --features journal-sdjournal"
-          - "--features config"
-          - "--features tasks"
-          - "--all-features"
+          - "--no-default-features --features rt-async-io"
+          - "--no-default-features --features rt-tokio"
+          - "--no-default-features --features rt-async-io,journal-cli"
+          - "--no-default-features --features rt-tokio,journal-cli"
+          - "--no-default-features --features rt-async-io,journal-sdjournal"
+          - "--no-default-features --features rt-tokio,journal-sdjournal"
+          - "--no-default-features --features rt-async-io,config"
+          - "--no-default-features --features rt-tokio,config"
+          - "--no-default-features --features rt-async-io,tasks"
+          - "--no-default-features --features rt-tokio,tasks"
+          - "--no-default-features --features rt-async-io,journal-sdjournal,config,tasks,observe,blocking,tracing"
+          - "--no-default-features --features rt-tokio,journal-sdjournal,config,tasks,observe,blocking,tracing"
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -47,12 +59,19 @@ jobs:
 
   doc:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        args:
+          - ""
+          - "--no-default-features --features rt-async-io,journal-sdjournal,journal-cli,config,tasks,observe,blocking,tracing"
+          - "--no-default-features --features rt-tokio,journal-sdjournal,journal-cli,config,tasks,observe,blocking,tracing"
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.92.0
-      - run: cargo doc --no-deps --all-features
+      - run: cargo doc --no-deps ${{ matrix.args }}
 
   package:
     runs-on: ubuntu-latest

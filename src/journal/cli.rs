@@ -104,7 +104,7 @@ pub(crate) async fn query_journalctl(
     let mut line = String::new();
     let mut collector = JournalCollector::new(&filter);
 
-    let mut deadline = async_io::Timer::after(timeout).fuse();
+    let mut deadline = crate::runtime::sleep(timeout).fuse();
 
     loop {
         line.clear();

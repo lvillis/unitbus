@@ -6,9 +6,23 @@
 // - `UNITBUS_ITEST_UNIT`: a safe unit name to restart (e.g. "cron.service" in a test VM)
 // - `UNITBUS_ITEST_DROPIN_UNIT`: a unit name to write drop-ins for (requires root/policy)
 
+use std::future::Future;
 use std::time::Duration;
 
 use unitbus::{UnitBus, UnitStartMode};
+
+fn block_on<T>(fut: impl Future<Output = T>) -> T {
+    #[cfg(feature = "rt-async-io")]
+    {
+        smol::block_on(fut)
+    }
+
+    #[cfg(feature = "rt-tokio")]
+    {
+        let rt = tokio::runtime::Runtime::new().expect("init tokio runtime");
+        rt.block_on(fut)
+    }
+}
 
 fn env(name: &str) -> Option<String> {
     match std::env::var(name) {
@@ -41,7 +55,7 @@ fn restart_and_wait() {
         }
     };
 
-    smol::block_on(async {
+    block_on(async {
         let bus = UnitBus::connect_system().await?;
         let job = bus.units().restart(&unit, UnitStartMode::Replace).await?;
         let outcome = job.wait(Duration::from_secs(30)).await?;
@@ -66,7 +80,7 @@ fn run_task_echo_and_fetch_logs() {
         }
     };
 
-    smol::block_on(async {
+    block_on(async {
         let bus = UnitBus::connect_system().await?;
 
         let mut spec = unitbus::TaskSpec::default();
@@ -129,7 +143,7 @@ fn run_task_failure_can_diagnose() {
         }
     };
 
-    smol::block_on(async {
+    block_on(async {
         let bus = UnitBus::connect_system().await?;
 
         let mut spec = unitbus::TaskSpec::default();
@@ -179,7 +193,7 @@ fn dropin_apply_remove_idempotent() {
         }
     };
 
-    smol::block_on(async {
+    block_on(async {
         let bus = UnitBus::connect_system().await?;
 
         let mut spec = unitbus::DropInSpec::default();

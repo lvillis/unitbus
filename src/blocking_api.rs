@@ -8,7 +8,8 @@ use std::time::Duration;
 /// Blocking wrapper for `UnitBus` (feature=`blocking`).
 ///
 /// This is a convenience API for environments where a synchronous interface is preferred.
-/// Internally it uses `async_io::block_on` to drive the async implementation.
+/// Internally it uses the selected runtime (`rt-async-io` or `rt-tokio`) to drive the async
+/// implementation.
 #[derive(Clone, Debug)]
 pub struct BlockingUnitBus {
     inner: UnitBus,
@@ -17,19 +18,19 @@ pub struct BlockingUnitBus {
 impl BlockingUnitBus {
     /// Connect to the system D-Bus (blocking).
     pub fn connect_system() -> Result<Self> {
-        let inner = async_io::block_on(UnitBus::connect_system())?;
+        let inner = crate::runtime::block_on_result(UnitBus::connect_system())?;
         Ok(Self { inner })
     }
 
     /// Connect to the system D-Bus with custom options (blocking).
     pub fn connect_system_with(opts: UnitBusOptions) -> Result<Self> {
-        let inner = async_io::block_on(UnitBus::connect_system_with(opts))?;
+        let inner = crate::runtime::block_on_result(UnitBus::connect_system_with(opts))?;
         Ok(Self { inner })
     }
 
     /// Probe environment capabilities conservatively (blocking).
-    pub fn capabilities(&self) -> Capabilities {
-        async_io::block_on(self.inner.capabilities())
+    pub fn capabilities(&self) -> Result<Capabilities> {
+        crate::runtime::block_on_result(async { Ok(self.inner.capabilities().await) })
     }
 
     /// Access unit/job control APIs (blocking wrappers).
@@ -71,26 +72,26 @@ pub struct BlockingUnits {
 
 impl BlockingUnits {
     pub fn get_status(&self, unit: &str) -> Result<UnitStatus> {
-        async_io::block_on(self.inner.get_status(unit))
+        crate::runtime::block_on_result(self.inner.get_status(unit))
     }
 
     pub fn start(&self, unit: &str, mode: UnitStartMode) -> Result<BlockingJobHandle> {
-        let job = async_io::block_on(self.inner.start(unit, mode))?;
+        let job = crate::runtime::block_on_result(self.inner.start(unit, mode))?;
         Ok(BlockingJobHandle { inner: job })
     }
 
     pub fn stop(&self, unit: &str, mode: UnitStartMode) -> Result<BlockingJobHandle> {
-        let job = async_io::block_on(self.inner.stop(unit, mode))?;
+        let job = crate::runtime::block_on_result(self.inner.stop(unit, mode))?;
         Ok(BlockingJobHandle { inner: job })
     }
 
     pub fn restart(&self, unit: &str, mode: UnitStartMode) -> Result<BlockingJobHandle> {
-        let job = async_io::block_on(self.inner.restart(unit, mode))?;
+        let job = crate::runtime::block_on_result(self.inner.restart(unit, mode))?;
         Ok(BlockingJobHandle { inner: job })
     }
 
     pub fn reload(&self, unit: &str, mode: UnitStartMode) -> Result<BlockingJobHandle> {
-        let job = async_io::block_on(self.inner.reload(unit, mode))?;
+        let job = crate::runtime::block_on_result(self.inner.reload(unit, mode))?;
         Ok(BlockingJobHandle { inner: job })
     }
 }
@@ -111,7 +112,7 @@ impl BlockingJobHandle {
     }
 
     pub fn wait(&self, timeout: Duration) -> Result<JobOutcome> {
-        async_io::block_on(self.inner.wait(timeout))
+        crate::runtime::block_on_result(self.inner.wait(timeout))
     }
 }
 
@@ -123,11 +124,11 @@ pub struct BlockingJournal {
 
 impl BlockingJournal {
     pub fn query(&self, filter: JournalFilter) -> Result<JournalResult> {
-        async_io::block_on(self.inner.query(filter))
+        crate::runtime::block_on_result(self.inner.query(filter))
     }
 
     pub fn diagnose_unit_failure(&self, unit: &str, opts: DiagnosisOptions) -> Result<Diagnosis> {
-        async_io::block_on(self.inner.diagnose_unit_failure(unit, opts))
+        crate::runtime::block_on_result(self.inner.diagnose_unit_failure(unit, opts))
     }
 }
 
@@ -141,7 +142,7 @@ pub struct BlockingTasks {
 #[cfg(feature = "tasks")]
 impl BlockingTasks {
     pub fn run(&self, spec: crate::TaskSpec) -> Result<BlockingTaskHandle> {
-        let handle = async_io::block_on(self.inner.run(spec))?;
+        let handle = crate::runtime::block_on_result(self.inner.run(spec))?;
         Ok(BlockingTaskHandle { inner: handle })
     }
 }
@@ -164,7 +165,7 @@ impl BlockingTaskHandle {
     }
 
     pub fn wait(&self, timeout: Duration) -> Result<crate::TaskResult> {
-        async_io::block_on(self.inner.wait(timeout))
+        crate::runtime::block_on_result(self.inner.wait(timeout))
     }
 }
 
@@ -178,14 +179,14 @@ pub struct BlockingConfig {
 #[cfg(feature = "config")]
 impl BlockingConfig {
     pub fn apply_dropin(&self, spec: crate::DropInSpec) -> Result<crate::ApplyReport> {
-        async_io::block_on(self.inner.apply_dropin(spec))
+        crate::runtime::block_on_result(self.inner.apply_dropin(spec))
     }
 
     pub fn remove_dropin(&self, unit: &str, name: &str) -> Result<crate::RemoveReport> {
-        async_io::block_on(self.inner.remove_dropin(unit, name))
+        crate::runtime::block_on_result(self.inner.remove_dropin(unit, name))
     }
 
     pub fn daemon_reload(&self) -> Result<()> {
-        async_io::block_on(self.inner.daemon_reload())
+        crate::runtime::block_on_result(self.inner.daemon_reload())
     }
 }

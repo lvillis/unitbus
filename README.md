@@ -20,6 +20,9 @@ platforms, but most operations will fail with `Error::BackendUnavailable`.
 ## Requirements
 
 - systemd on the system bus (`org.freedesktop.systemd1`)
+- async runtime backend (mutually exclusive):
+  - default: `rt-async-io` (no `tokio` dependency)
+  - optional: `rt-tokio` (tokio backend)
 - journald backend:
   - default: pure Rust journal reader (feature=`journal-sdjournal`)
   - optional: `journalctl` JSON backend (feature=`journal-cli`)
@@ -29,13 +32,15 @@ platforms, but most operations will fail with `Error::BackendUnavailable`.
 
 ## Features
 
+- Default runtime: `rt-async-io`
+- Optional runtime: `rt-tokio` (mutually exclusive with `rt-async-io`)
 - Default: `journal-sdjournal` (pure Rust journald backend, no `journalctl` subprocess)
 - Optional: `journal-cli` (journald via `journalctl --output=json`)
 - Optional: `config` (drop-in management)
 - Optional: `tasks` (transient tasks via `StartTransientUnit`)
 - Optional: `tracing` (instrumentation via `tracing`)
 - Optional: `observe` (watch unit failures via D-Bus signals)
-- Optional: `blocking` (synchronous wrappers, powered by `async_io::block_on`)
+- Optional: `blocking` (synchronous wrappers, driven by the selected runtime)
 
 ## Installation
 
@@ -48,7 +53,14 @@ To use the `journalctl` backend (JSON):
 
 ```toml
 [dependencies]
-unitbus = { version = "0.1", default-features = false, features = ["journal-cli"] }
+unitbus = { version = "0.1", default-features = false, features = ["rt-async-io", "journal-cli"] }
+```
+
+To use tokio runtime (recommended for tokio apps):
+
+```toml
+[dependencies]
+unitbus = { version = "0.1", default-features = false, features = ["rt-tokio", "journal-sdjournal"] }
 ```
 
 ## Quick start

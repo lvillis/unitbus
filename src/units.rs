@@ -133,8 +133,8 @@ impl JobInner {
             self.root.opts.job_poll_max,
             &mut jitter,
         );
-        let mut poll_timer = futures_util::FutureExt::fuse(async_io::Timer::after(poll_interval));
-        let mut deadline = futures_util::FutureExt::fuse(async_io::Timer::after(timeout));
+        let mut poll_timer = futures_util::FutureExt::fuse(crate::runtime::sleep(poll_interval));
+        let mut deadline = futures_util::FutureExt::fuse(crate::runtime::sleep(timeout));
 
         if !self.root.bus.job_exists(job_path).await? {
             let status = Units::new(self.root.clone()).get_status(unit).await?;
@@ -153,7 +153,7 @@ impl JobInner {
                         }
                         poll_interval = next_poll_interval(poll_interval, self.root.opts.job_poll_max, &mut jitter);
                         poll_timer =
-                            futures_util::FutureExt::fuse(async_io::Timer::after(poll_interval));
+                            futures_util::FutureExt::fuse(crate::runtime::sleep(poll_interval));
                     }
                     msg = sig.next() => {
                         let Some(msg) = msg else {
@@ -177,7 +177,7 @@ impl JobInner {
                         }
                         poll_interval = next_poll_interval(poll_interval, self.root.opts.job_poll_max, &mut jitter);
                         poll_timer =
-                            futures_util::FutureExt::fuse(async_io::Timer::after(poll_interval));
+                            futures_util::FutureExt::fuse(crate::runtime::sleep(poll_interval));
                     }
                 }
             }

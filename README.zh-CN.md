@@ -17,6 +17,9 @@
 ## 环境要求
 
 - system bus 上存在 systemd（`org.freedesktop.systemd1`）
+- async runtime 后端（二选一）：
+  - 默认：`rt-async-io`（不依赖 `tokio`）
+  - 可选：`rt-tokio`（tokio 后端）
 - journald 后端：
   - 默认：纯 Rust 读取 journal 文件（feature=`journal-sdjournal`）
   - 可选：`journalctl` JSON 后端（feature=`journal-cli`）
@@ -26,13 +29,15 @@
 
 ## Features
 
+- 默认运行时：`rt-async-io`
+- 可选运行时：`rt-tokio`（与 `rt-async-io` 互斥）
 - 默认：`journal-sdjournal`（纯 Rust journald 后端，不依赖 `journalctl` 子进程）
 - 可选：`journal-cli`（通过 `journalctl --output=json` 读取 journald）
 - 可选：`config`（drop-in 配置管理）
 - 可选：`tasks`（通过 `StartTransientUnit` 执行 transient task）
 - 可选：`tracing`（通过 `tracing` 增强可观测性）
 - 可选：`observe`（通过 D-Bus 信号观察 unit 失败事件）
-- 可选：`blocking`（同步封装，内部使用 `async_io::block_on`）
+- 可选：`blocking`（同步封装，由所选 runtime 驱动）
 
 ## 安装
 
@@ -45,7 +50,14 @@ unitbus = "0.1"
 
 ```toml
 [dependencies]
-unitbus = { version = "0.1", default-features = false, features = ["journal-cli"] }
+unitbus = { version = "0.1", default-features = false, features = ["rt-async-io", "journal-cli"] }
+```
+
+tokio 项目推荐：
+
+```toml
+[dependencies]
+unitbus = { version = "0.1", default-features = false, features = ["rt-tokio", "journal-sdjournal"] }
 ```
 
 ## 快速开始
@@ -76,5 +88,5 @@ async fn restart_nginx() -> Result<(), unitbus::Error> {
 这些测试默认是 `#[ignore]`，用于在真实 systemd 环境上验收：
 
 ```bash
-UNITBUS_ITEST_UNIT=dbus.service cargo test --all-features --test integration_linux -- --ignored
+UNITBUS_ITEST_UNIT=dbus.service cargo test --no-default-features --features rt-async-io,journal-sdjournal,tasks,config,observe,blocking,tracing --test integration_linux -- --ignored
 ```
