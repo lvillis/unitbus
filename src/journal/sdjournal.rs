@@ -81,7 +81,11 @@ fn query_sdjournal_sync(
     let mut q = journal.query();
 
     if let Some(unit) = &unit {
-        q.match_exact("_SYSTEMD_UNIT", unit.as_bytes());
+        q.or_group(|g| {
+            g.match_exact("_SYSTEMD_UNIT", unit.as_bytes());
+            g.match_exact("UNIT", unit.as_bytes());
+            g.match_exact("OBJECT_SYSTEMD_UNIT", unit.as_bytes());
+        });
     }
     if let Some(us) = since_realtime {
         q.since_realtime(us);

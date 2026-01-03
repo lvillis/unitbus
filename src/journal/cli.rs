@@ -351,11 +351,18 @@ fn parse_entry(line: &str, max_message_bytes: u32) -> Result<JournalEntry> {
         .and_then(|v| v.as_str())
         .and_then(non_empty);
 
-    let (message, message_truncated) = match obj.get("MESSAGE").and_then(|v| v.as_str()) {
-        Some(s) => {
+    let (message, message_truncated) = match obj.get("MESSAGE") {
+        Some(serde_json::Value::String(s)) => {
             let max = usize::try_from(max_message_bytes).unwrap_or(0);
             let (t, tr) = crate::util::truncate_string_bytes(s, max);
             (Some(t), tr)
+        }
+        Some(v) => {
+            let bytes = json_value_to_bytes(v);
+            let max = usize::try_from(max_message_bytes).unwrap_or(0);
+            let truncated = bytes.len() > max;
+            let slice = if truncated { &bytes[..max] } else { &bytes };
+            (Some(String::from_utf8_lossy(slice).into_owned()), truncated)
         }
         None => (None, false),
     };
@@ -540,6 +547,14 @@ mod tests {
         let e = parse_entry(line, 3).expect("parse ok");
         assert_eq!(e.message.as_deref(), Some("abc"));
         assert!(e.message_truncated);
+    }
+
+    #[test]
+    fn parse_entry_accepts_non_string_message() {
+        let line = r#"{"__REALTIME_TIMESTAMP":"1","MESSAGE":[104,101,108,108,111]}"#;
+        let e = parse_entry(line, 16 * 1024).expect("parse ok");
+        assert_eq!(e.message.as_deref(), Some("hello"));
+        assert!(!e.message_truncated);
     }
 
     #[test]
