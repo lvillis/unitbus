@@ -1,3 +1,8 @@
+## [0.1.7] - 2026-01-23
+
+### 🚀 Features
+
+- *(config)* Manage service unit files
 ## [0.1.6] - 2026-01-23
 
 ### 🚀 Features
@@ -7,6 +12,7 @@
 ### ⚙️ Miscellaneous Tasks
 
 - *(ci)* Update
+- Release unitbus version 0.1.6
 ## [0.1.5] - 2026-01-03
 
 ### 🐛 Bug Fixes
