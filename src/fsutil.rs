@@ -1,12 +1,11 @@
 use crate::types::config::{ApplyReport, DropInSpec, RecommendedAction, RemoveReport};
+use crate::types::unit_file::{UnitFileRemoveReport, UnitFileWriteReport};
 use crate::{Error, Result, util};
 
 use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
-
-const ETC_SYSTEMD_SYSTEM: &str = "/etc/systemd/system";
 
 static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -32,13 +31,13 @@ pub(crate) fn render_dropin(spec: &DropInSpec) -> Result<String> {
     for (k, v) in &spec.environment {
         let assignment = format!("{k}={v}");
         out.push_str("Environment=");
-        out.push_str(&quote_systemd_value(&assignment));
+        out.push_str(&util::quote_systemd_value(&assignment));
         out.push('\n');
     }
 
     if let Some(dir) = &spec.working_directory {
         out.push_str("WorkingDirectory=");
-        out.push_str(&quote_systemd_value(dir));
+        out.push_str(&util::quote_systemd_value(dir));
         out.push('\n');
     }
 
@@ -62,15 +61,20 @@ pub(crate) fn render_dropin(spec: &DropInSpec) -> Result<String> {
         }
         out.push_str("ExecStart=\n");
         out.push_str("ExecStart=");
-        out.push_str(&render_exec(argv)?);
+        out.push_str(&util::render_systemd_exec(argv)?);
         out.push('\n');
     }
 
     Ok(out)
 }
 
-pub(crate) fn apply_dropin_file(unit: &str, name: &str, contents: String) -> Result<ApplyReport> {
-    let path = dropin_path(unit, name);
+pub(crate) fn apply_dropin_file(
+    systemd_system_dir: &Path,
+    unit: &str,
+    name: &str,
+    contents: String,
+) -> Result<ApplyReport> {
+    let path = dropin_path(systemd_system_dir, unit, name);
     let dir = path
         .parent()
         .ok_or_else(|| Error::invalid_input("invalid drop-in path"))?;
@@ -104,8 +108,12 @@ pub(crate) fn apply_dropin_file(unit: &str, name: &str, contents: String) -> Res
     })
 }
 
-pub(crate) fn remove_dropin_file(unit: &str, name: &str) -> Result<RemoveReport> {
-    let path = dropin_path(unit, name);
+pub(crate) fn remove_dropin_file(
+    systemd_system_dir: &Path,
+    unit: &str,
+    name: &str,
+) -> Result<RemoveReport> {
+    let path = dropin_path(systemd_system_dir, unit, name);
     match fs::remove_file(&path) {
         Ok(()) => Ok(RemoveReport {
             changed: true,
@@ -121,10 +129,93 @@ pub(crate) fn remove_dropin_file(unit: &str, name: &str) -> Result<RemoveReport>
     }
 }
 
-fn dropin_path(unit: &str, name: &str) -> PathBuf {
-    Path::new(ETC_SYSTEMD_SYSTEM)
+pub(crate) fn apply_unit_file(
+    systemd_system_dir: &Path,
+    unit: &str,
+    contents: String,
+) -> Result<UnitFileWriteReport> {
+    validate_unit_file_name(unit)?;
+
+    let path = unit_file_path(systemd_system_dir, unit);
+    let dir = path
+        .parent()
+        .ok_or_else(|| Error::invalid_input("invalid unit file path"))?;
+
+    fs::create_dir_all(dir).map_err(|e| map_unitfile_io("create unit directory", dir, e))?;
+
+    let existing = match fs::read(&path) {
+        Ok(b) => Some(b),
+        Err(e) if e.kind() == io::ErrorKind::NotFound => None,
+        Err(e) => return Err(map_unitfile_io("read unit file", &path, e)),
+    };
+
+    if let Some(existing) = existing
+        && existing == contents.as_bytes()
+    {
+        return Ok(UnitFileWriteReport {
+            changed: false,
+            path_written: path.to_string_lossy().into_owned(),
+            requires_daemon_reload: false,
+        });
+    }
+
+    atomic_write(&path, contents.as_bytes())
+        .map_err(|e| map_unitfile_io("write unit file", &path, e))?;
+
+    Ok(UnitFileWriteReport {
+        changed: true,
+        path_written: path.to_string_lossy().into_owned(),
+        requires_daemon_reload: true,
+    })
+}
+
+pub(crate) fn remove_unit_file(
+    systemd_system_dir: &Path,
+    unit: &str,
+) -> Result<UnitFileRemoveReport> {
+    validate_unit_file_name(unit)?;
+
+    let path = unit_file_path(systemd_system_dir, unit);
+    match fs::remove_file(&path) {
+        Ok(()) => Ok(UnitFileRemoveReport {
+            changed: true,
+            path_removed: path.to_string_lossy().into_owned(),
+            requires_daemon_reload: true,
+        }),
+        Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(UnitFileRemoveReport {
+            changed: false,
+            path_removed: path.to_string_lossy().into_owned(),
+            requires_daemon_reload: false,
+        }),
+        Err(e) => Err(map_unitfile_io("remove unit file", &path, e)),
+    }
+}
+
+fn dropin_path(systemd_system_dir: &Path, unit: &str, name: &str) -> PathBuf {
+    systemd_system_dir
         .join(format!("{unit}.d"))
         .join(format!("{name}.conf"))
+}
+
+fn unit_file_path(systemd_system_dir: &Path, unit: &str) -> PathBuf {
+    systemd_system_dir.join(unit)
+}
+
+fn validate_unit_file_name(unit: &str) -> Result<()> {
+    util::validate_no_control("unit", unit)?;
+    let unit = unit.trim();
+    if unit.is_empty() {
+        return Err(Error::invalid_input("unit must not be empty"));
+    }
+    if unit.contains('/') || unit.contains('\\') {
+        return Err(Error::invalid_input(
+            "unit must not contain path separators",
+        ));
+    }
+    if unit.contains("..") {
+        return Err(Error::invalid_input("unit must not contain '..'"));
+    }
+    Ok(())
 }
 
 fn atomic_write(path: &Path, contents: &[u8]) -> io::Result<()> {
@@ -171,6 +262,18 @@ fn map_dropin_io(context: &'static str, path: &Path, e: io::Error) -> Error {
     }
 }
 
+fn map_unitfile_io(context: &'static str, path: &Path, e: io::Error) -> Error {
+    if e.kind() == io::ErrorKind::PermissionDenied {
+        return Error::PermissionDenied {
+            action: "write_unit_files",
+            detail: format!("{context} {}: {e}", path.to_string_lossy()),
+        };
+    }
+    Error::IoError {
+        context: format!("{context} {}: {e}", path.to_string_lossy()),
+    }
+}
+
 #[cfg(unix)]
 fn fsync_dir(dir: &Path) -> io::Result<()> {
     let f = fs::File::open(dir)?;
@@ -182,36 +285,6 @@ fn fsync_dir(_dir: &Path) -> io::Result<()> {
     Ok(())
 }
 
-fn quote_systemd_value(value: &str) -> String {
-    let escaped = value.replace('\\', "\\\\").replace('"', "\\\"");
-    format!("\"{escaped}\"")
-}
-
-fn render_exec(argv: &[String]) -> Result<String> {
-    for arg in argv {
-        util::validate_no_control("exec argv", arg)?;
-    }
-    Ok(argv
-        .iter()
-        .map(|a| quote_exec_arg(a))
-        .collect::<Vec<_>>()
-        .join(" "))
-}
-
-fn quote_exec_arg(arg: &str) -> String {
-    if arg.is_empty() {
-        return "\"\"".to_string();
-    }
-    if arg
-        .chars()
-        .any(|c| c.is_whitespace() || c == '"' || c == '\\')
-    {
-        quote_systemd_value(arg)
-    } else {
-        arg.to_string()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     #![allow(clippy::expect_used)]
@@ -219,6 +292,17 @@ mod tests {
     #![allow(clippy::unwrap_used)]
 
     use super::*;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    static TEST_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+    fn temp_dir(name: &str) -> PathBuf {
+        let n = TEST_DIR_COUNTER.fetch_add(1, Ordering::Relaxed);
+        let mut dir = std::env::temp_dir();
+        dir.push(format!("unitbus-{name}-{}-{n}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("create temp dir");
+        dir
+    }
 
     #[test]
     fn render_dropin_is_stable_and_sorted() {
@@ -241,5 +325,59 @@ mod tests {
         let idx_b = rendered.find("Environment=\"B=2\"").expect("B exists");
         assert!(idx_a < idx_b);
         assert!(rendered.ends_with('\n'));
+    }
+
+    #[test]
+    fn apply_and_remove_unit_file_is_idempotent() {
+        let dir = temp_dir("unitfile");
+        let unit = "unitbus-test.service";
+
+        let r1 = apply_unit_file(&dir, unit, "a\n".to_string()).expect("write ok");
+        assert!(r1.changed);
+        assert!(r1.requires_daemon_reload);
+
+        let r2 = apply_unit_file(&dir, unit, "a\n".to_string()).expect("write ok");
+        assert!(!r2.changed);
+        assert!(!r2.requires_daemon_reload);
+
+        let r3 = apply_unit_file(&dir, unit, "b\n".to_string()).expect("write ok");
+        assert!(r3.changed);
+        assert!(r3.requires_daemon_reload);
+
+        let rm1 = remove_unit_file(&dir, unit).expect("remove ok");
+        assert!(rm1.changed);
+        assert!(rm1.requires_daemon_reload);
+
+        let rm2 = remove_unit_file(&dir, unit).expect("remove ok");
+        assert!(!rm2.changed);
+        assert!(!rm2.requires_daemon_reload);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn apply_and_remove_dropin_is_idempotent() {
+        let dir = temp_dir("dropin");
+        let unit = "unitbus-test.service";
+        let name = "demo";
+        let contents = "[Service]\nEnvironment=\"A=1\"\n".to_string();
+
+        let r1 = apply_dropin_file(&dir, unit, name, contents.clone()).expect("apply ok");
+        assert!(r1.changed);
+        assert!(r1.requires_daemon_reload);
+
+        let r2 = apply_dropin_file(&dir, unit, name, contents).expect("apply ok");
+        assert!(!r2.changed);
+        assert!(!r2.requires_daemon_reload);
+
+        let rm1 = remove_dropin_file(&dir, unit, name).expect("remove ok");
+        assert!(rm1.changed);
+        assert!(rm1.requires_daemon_reload);
+
+        let rm2 = remove_dropin_file(&dir, unit, name).expect("remove ok");
+        assert!(!rm2.changed);
+        assert!(!rm2.requires_daemon_reload);
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

@@ -15,6 +15,11 @@ pub struct UnitBusOptions {
 
     /// Maximum polling interval for job wait fallback.
     pub job_poll_max: Duration,
+
+    /// Base directory for systemd unit files and drop-ins (feature=`config`).
+    ///
+    /// Default: `/etc/systemd/system`.
+    pub systemd_system_dir: String,
 }
 
 impl Default for UnitBusOptions {
@@ -24,6 +29,7 @@ impl Default for UnitBusOptions {
             journal_default_timeout: Duration::from_secs(10),
             job_poll_initial: Duration::from_millis(200),
             job_poll_max: Duration::from_secs(2),
+            systemd_system_dir: "/etc/systemd/system".to_string(),
         }
     }
 }

@@ -31,6 +31,15 @@ fn env(name: &str) -> Option<String> {
     }
 }
 
+fn find_executable(candidates: &[&str]) -> Option<String> {
+    for c in candidates {
+        if std::path::Path::new(c).exists() {
+            return Some((*c).to_string());
+        }
+    }
+    None
+}
+
 #[test]
 #[ignore]
 fn manager_list_units_and_info_read_only() {
@@ -161,19 +170,6 @@ fn can_read_unit_properties_by_path_read_only() {
         Ok::<(), unitbus::Error>(())
     })
     .unwrap();
-}
-
-#[cfg(all(
-    feature = "tasks",
-    any(feature = "journal-cli", feature = "journal-sdjournal")
-))]
-fn find_executable(candidates: &[&str]) -> Option<String> {
-    for c in candidates {
-        if std::path::Path::new(c).exists() {
-            return Some((*c).to_string());
-        }
-    }
-    None
 }
 
 #[test]
@@ -352,6 +348,89 @@ fn dropin_apply_remove_idempotent() {
 
         let rm2 = bus.config().remove_dropin(&unit, "unitbus-itest").await?;
         assert!(!rm2.changed, "expected idempotent remove");
+
+        Ok::<(), unitbus::Error>(())
+    })
+    .unwrap();
+}
+
+#[cfg(feature = "config")]
+#[test]
+#[ignore]
+fn install_uninstall_service_unit_file() {
+    let unit = match env("UNITBUS_ITEST_UNITFILE_UNIT") {
+        Some(u) => u,
+        None => {
+            eprintln!(
+                "set UNITBUS_ITEST_UNITFILE_UNIT to a unique service name (e.g. unitbus-itest.service)"
+            );
+            return;
+        }
+    };
+
+    let exe = match find_executable(&["/bin/sleep", "/usr/bin/sleep", "/bin/true", "/usr/bin/true"])
+    {
+        Some(p) => p,
+        None => {
+            eprintln!("cannot find /bin/sleep or /bin/true; skipping");
+            return;
+        }
+    };
+
+    block_on(async {
+        let bus = UnitBus::connect_system().await?;
+
+        let argv = if exe.ends_with("/sleep") {
+            vec![exe, "1".to_string()]
+        } else {
+            vec![exe]
+        };
+
+        let mut spec = unitbus::ServiceUnitSpec::default();
+        spec.unit = unit.clone();
+        spec.description = Some("unitbus integration test service unit".to_string());
+        spec.service_type = Some(unitbus::ServiceType::Oneshot);
+        spec.exec_start = argv;
+        spec.wanted_by = vec!["multi-user.target".to_string()];
+
+        let unit_name = spec.canonical_unit_name()?;
+
+        let install = match bus
+            .config()
+            .install_service_unit(spec, Default::default())
+            .await
+        {
+            Ok(r) => r,
+            Err(unitbus::Error::PermissionDenied { .. }) => {
+                eprintln!("permission denied; skipping install_service_unit");
+                return Ok(());
+            }
+            Err(e) => {
+                let _ = bus.config().remove_unit_file(&unit_name).await;
+                let _ = bus.config().daemon_reload().await;
+                return Err(e);
+            }
+        };
+
+        let uninstall = match bus
+            .config()
+            .uninstall_unit(&install.unit, Default::default())
+            .await
+        {
+            Ok(r) => r,
+            Err(unitbus::Error::PermissionDenied { .. }) => {
+                eprintln!(
+                    "permission denied; skipping uninstall cleanup (manual cleanup may be required)"
+                );
+                return Ok(());
+            }
+            Err(e) => return Err(e),
+        };
+
+        assert!(
+            uninstall.removed.path_removed.contains(&install.unit),
+            "expected removed file path to mention unit name"
+        );
 
         Ok::<(), unitbus::Error>(())
     })

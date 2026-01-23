@@ -491,7 +491,7 @@ fn get_i32(map: &HashMap<String, OwnedValue>, key: &str) -> Option<i32> {
 
 #[cfg(feature = "config")]
 #[derive(Clone, Debug)]
-/// Drop-in configuration management (feature=`config`).
+/// systemd configuration management (unit files + drop-ins) (feature=`config`).
 pub struct Config {
     inner: Arc<crate::Inner>,
 }
@@ -502,7 +502,199 @@ impl Config {
         Self { inner }
     }
 
-    /// Apply a drop-in file under `/etc/systemd/system/<unit>.d/<name>.conf`.
+    #[cfg(target_os = "linux")]
+    fn systemd_system_dir(&self) -> Result<std::path::PathBuf> {
+        let dir = self.inner.opts.systemd_system_dir.trim();
+        util::validate_no_control("systemd_system_dir", dir)?;
+        if dir.is_empty() {
+            return Err(Error::invalid_input("systemd_system_dir must not be empty"));
+        }
+        Ok(std::path::PathBuf::from(dir))
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    fn systemd_system_dir(&self) -> Result<std::path::PathBuf> {
+        Err(Error::BackendUnavailable {
+            backend: "systemd_config",
+            detail: "config APIs are only supported on Linux".to_string(),
+        })
+    }
+
+    /// Write a systemd service unit file under `UnitBusOptions.systemd_system_dir`.
+    pub async fn write_service_unit(
+        &self,
+        mut spec: crate::ServiceUnitSpec,
+    ) -> Result<crate::UnitFileWriteReport> {
+        spec.unit = spec.canonical_unit_name()?;
+        let unit = spec.unit.clone();
+        let contents = spec.render()?;
+
+        #[cfg(feature = "tracing")]
+        tracing::info!(unit = %unit, "write_service_unit");
+
+        let unit2 = unit.clone();
+        let systemd_system_dir = self.systemd_system_dir()?;
+        let report = blocking::unblock(move || {
+            crate::fsutil::apply_unit_file(&systemd_system_dir, &unit2, contents)
+        })
+        .await?;
+
+        #[cfg(feature = "tracing")]
+        tracing::info!(
+            unit = %unit,
+            changed = report.changed,
+            requires_daemon_reload = report.requires_daemon_reload,
+            "write_service_unit done"
+        );
+
+        Ok(report)
+    }
+
+    /// Remove a unit file under `UnitBusOptions.systemd_system_dir`.
+    ///
+    /// `unit` is canonicalized (e.g. `"nginx"` becomes `"nginx.service"`).
+    pub async fn remove_unit_file(&self, unit: &str) -> Result<crate::UnitFileRemoveReport> {
+        let unit = util::canonicalize_unit_name(unit)?;
+
+        #[cfg(feature = "tracing")]
+        tracing::info!(unit = %unit, "remove_unit_file");
+
+        let unit2 = unit.clone();
+        let systemd_system_dir = self.systemd_system_dir()?;
+        let report =
+            blocking::unblock(move || crate::fsutil::remove_unit_file(&systemd_system_dir, &unit2))
+                .await?;
+
+        #[cfg(feature = "tracing")]
+        tracing::info!(
+            unit = %unit,
+            changed = report.changed,
+            requires_daemon_reload = report.requires_daemon_reload,
+            "remove_unit_file done"
+        );
+
+        Ok(report)
+    }
+
+    /// Enable a unit (`org.freedesktop.systemd1.Manager.EnableUnitFiles`).
+    ///
+    /// `unit` is canonicalized (e.g. `"nginx"` becomes `"nginx.service"`).
+    pub async fn enable_unit(
+        &self,
+        unit: &str,
+        opts: crate::UnitFileEnableOptions,
+    ) -> Result<crate::UnitFileEnableReport> {
+        let unit = util::canonicalize_unit_name(unit)?;
+
+        #[cfg(feature = "tracing")]
+        tracing::info!(unit = %unit, runtime = opts.runtime, force = opts.force, "enable_unit");
+
+        let files = vec![unit];
+        let (carries_install_info, changes) = self
+            .inner
+            .bus
+            .enable_unit_files(&files, opts.runtime, opts.force)
+            .await?;
+
+        Ok(crate::UnitFileEnableReport {
+            carries_install_info,
+            changes: changes
+                .into_iter()
+                .map(crate::UnitFileChange::from_dbus)
+                .collect(),
+        })
+    }
+
+    /// Disable a unit (`org.freedesktop.systemd1.Manager.DisableUnitFiles`).
+    ///
+    /// `unit` is canonicalized (e.g. `"nginx"` becomes `"nginx.service"`).
+    pub async fn disable_unit(
+        &self,
+        unit: &str,
+        opts: crate::UnitFileDisableOptions,
+    ) -> Result<crate::UnitFileDisableReport> {
+        let unit = util::canonicalize_unit_name(unit)?;
+
+        #[cfg(feature = "tracing")]
+        tracing::info!(unit = %unit, runtime = opts.runtime, "disable_unit");
+
+        let files = vec![unit];
+        let changes = self
+            .inner
+            .bus
+            .disable_unit_files(&files, opts.runtime)
+            .await?;
+
+        Ok(crate::UnitFileDisableReport {
+            changes: changes
+                .into_iter()
+                .map(crate::UnitFileChange::from_dbus)
+                .collect(),
+        })
+    }
+
+    /// Install a service unit file (write + optional daemon-reload + optional enable).
+    pub async fn install_service_unit(
+        &self,
+        spec: crate::ServiceUnitSpec,
+        opts: crate::ServiceUnitInstallOptions,
+    ) -> Result<crate::ServiceUnitInstallReport> {
+        let unit = spec.canonical_unit_name()?;
+        let wrote = self.write_service_unit(spec).await?;
+
+        let mut daemon_reload_performed = false;
+        if opts.daemon_reload && wrote.requires_daemon_reload {
+            self.daemon_reload().await?;
+            daemon_reload_performed = true;
+        }
+
+        let enabled = if opts.enable {
+            Some(self.enable_unit(&unit, opts.enable_options).await?)
+        } else {
+            None
+        };
+
+        Ok(crate::ServiceUnitInstallReport {
+            unit,
+            wrote,
+            daemon_reload_performed,
+            enabled,
+        })
+    }
+
+    /// Uninstall a unit file (optional disable + remove + optional daemon-reload).
+    ///
+    /// `unit` is canonicalized (e.g. `"nginx"` becomes `"nginx.service"`).
+    pub async fn uninstall_unit(
+        &self,
+        unit: &str,
+        opts: crate::UnitUninstallOptions,
+    ) -> Result<crate::UnitUninstallReport> {
+        let unit = util::canonicalize_unit_name(unit)?;
+
+        let disabled = if opts.disable {
+            Some(self.disable_unit(&unit, opts.disable_options).await?)
+        } else {
+            None
+        };
+
+        let removed = self.remove_unit_file(&unit).await?;
+
+        let mut daemon_reload_performed = false;
+        if opts.daemon_reload && removed.requires_daemon_reload {
+            self.daemon_reload().await?;
+            daemon_reload_performed = true;
+        }
+
+        Ok(crate::UnitUninstallReport {
+            unit,
+            disabled,
+            removed,
+            daemon_reload_performed,
+        })
+    }
+
+    /// Apply a drop-in file under `UnitBusOptions.systemd_system_dir`.
     pub async fn apply_dropin(
         &self,
         mut spec: crate::types::config::DropInSpec,
@@ -526,9 +718,11 @@ impl Config {
         let unit = spec.unit.clone();
         let name = spec.name.clone();
         let contents = crate::fsutil::render_dropin(&spec)?;
-        let report =
-            blocking::unblock(move || crate::fsutil::apply_dropin_file(&unit, &name, contents))
-                .await?;
+        let systemd_system_dir = self.systemd_system_dir()?;
+        let report = blocking::unblock(move || {
+            crate::fsutil::apply_dropin_file(&systemd_system_dir, &unit, &name, contents)
+        })
+        .await?;
 
         #[cfg(feature = "tracing")]
         tracing::info!(
@@ -542,7 +736,7 @@ impl Config {
         Ok(report)
     }
 
-    /// Remove a drop-in file under `/etc/systemd/system/<unit>.d/<name>.conf`.
+    /// Remove a drop-in file under `UnitBusOptions.systemd_system_dir`.
     pub async fn remove_dropin(
         &self,
         unit: &str,
@@ -556,8 +750,11 @@ impl Config {
 
         let unit2 = unit.clone();
         let name2 = name.to_string();
-        let report =
-            blocking::unblock(move || crate::fsutil::remove_dropin_file(&unit2, &name2)).await?;
+        let systemd_system_dir = self.systemd_system_dir()?;
+        let report = blocking::unblock(move || {
+            crate::fsutil::remove_dropin_file(&systemd_system_dir, &unit2, &name2)
+        })
+        .await?;
 
         #[cfg(feature = "tracing")]
         tracing::info!(

@@ -47,7 +47,6 @@ pub(crate) fn validate_dropin_name(input: &str) -> Result<()> {
     Ok(())
 }
 
-#[cfg(any(feature = "config", feature = "tasks"))]
 pub(crate) fn validate_env_key(input: &str) -> Result<()> {
     validate_no_control("env key", input)?;
     if input.is_empty() {
@@ -76,6 +75,36 @@ pub(crate) fn validate_no_control(context: &'static str, input: &str) -> Result<
         )));
     }
     Ok(())
+}
+
+pub(crate) fn quote_systemd_value(value: &str) -> String {
+    let escaped = value.replace('\\', "\\\\").replace('\"', "\\\"");
+    format!("\"{escaped}\"")
+}
+
+pub(crate) fn render_systemd_exec(argv: &[String]) -> Result<String> {
+    for arg in argv {
+        validate_no_control("exec argv", arg)?;
+    }
+    Ok(argv
+        .iter()
+        .map(|a| quote_systemd_exec_arg(a))
+        .collect::<Vec<_>>()
+        .join(" "))
+}
+
+fn quote_systemd_exec_arg(arg: &str) -> String {
+    if arg.is_empty() {
+        return "\"\"".to_string();
+    }
+    if arg
+        .chars()
+        .any(|c| c.is_whitespace() || c == '"' || c == '\\')
+    {
+        quote_systemd_value(arg)
+    } else {
+        arg.to_string()
+    }
 }
 
 #[cfg(feature = "journal-cli")]

@@ -63,7 +63,7 @@ impl BlockingUnitBus {
         }
     }
 
-    /// Access drop-in config APIs (blocking wrappers).
+    /// Access systemd config APIs (unit files + drop-ins) (blocking wrappers).
     #[cfg(feature = "config")]
     pub fn config(&self) -> BlockingConfig {
         BlockingConfig {
@@ -242,6 +242,49 @@ pub struct BlockingConfig {
 
 #[cfg(feature = "config")]
 impl BlockingConfig {
+    pub fn write_service_unit(
+        &self,
+        spec: crate::ServiceUnitSpec,
+    ) -> Result<crate::UnitFileWriteReport> {
+        crate::runtime::block_on_result(self.inner.write_service_unit(spec))
+    }
+
+    pub fn remove_unit_file(&self, unit: &str) -> Result<crate::UnitFileRemoveReport> {
+        crate::runtime::block_on_result(self.inner.remove_unit_file(unit))
+    }
+
+    pub fn enable_unit(
+        &self,
+        unit: &str,
+        opts: crate::UnitFileEnableOptions,
+    ) -> Result<crate::UnitFileEnableReport> {
+        crate::runtime::block_on_result(self.inner.enable_unit(unit, opts))
+    }
+
+    pub fn disable_unit(
+        &self,
+        unit: &str,
+        opts: crate::UnitFileDisableOptions,
+    ) -> Result<crate::UnitFileDisableReport> {
+        crate::runtime::block_on_result(self.inner.disable_unit(unit, opts))
+    }
+
+    pub fn install_service_unit(
+        &self,
+        spec: crate::ServiceUnitSpec,
+        opts: crate::ServiceUnitInstallOptions,
+    ) -> Result<crate::ServiceUnitInstallReport> {
+        crate::runtime::block_on_result(self.inner.install_service_unit(spec, opts))
+    }
+
+    pub fn uninstall_unit(
+        &self,
+        unit: &str,
+        opts: crate::UnitUninstallOptions,
+    ) -> Result<crate::UnitUninstallReport> {
+        crate::runtime::block_on_result(self.inner.uninstall_unit(unit, opts))
+    }
+
     pub fn apply_dropin(&self, spec: crate::DropInSpec) -> Result<crate::ApplyReport> {
         crate::runtime::block_on_result(self.inner.apply_dropin(spec))
     }

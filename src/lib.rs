@@ -82,6 +82,14 @@ pub use crate::types::task::{TaskHandle, TaskResult, TaskSpec};
 pub use crate::types::unit::{
     ActiveState, FailureHint, JobHandle, JobOutcome, LoadState, UnitStartMode, UnitStatus,
 };
+pub use crate::types::unit_file::{ServiceType, ServiceUnitSpec};
+
+#[cfg(feature = "config")]
+pub use crate::types::unit_file::{
+    ServiceUnitInstallOptions, ServiceUnitInstallReport, UnitFileChange, UnitFileDisableOptions,
+    UnitFileDisableReport, UnitFileEnableOptions, UnitFileEnableReport, UnitFileRemoveReport,
+    UnitFileWriteReport, UnitUninstallOptions, UnitUninstallReport,
+};
 
 pub use crate::capabilities::Capabilities;
 pub use crate::error::{Error, Result};

@@ -6,3 +6,4 @@ pub(crate) mod properties;
 #[cfg(feature = "tasks")]
 pub(crate) mod task;
 pub(crate) mod unit;
+pub(crate) mod unit_file;

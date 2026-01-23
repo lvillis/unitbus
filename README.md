@@ -17,6 +17,7 @@ platforms, but most operations will fail with `Error::BackendUnavailable`.
 - Troubleshooting: get unit status + a bounded slice of recent logs on failure
 - Deployment tasks: run one-shot commands as transient units and collect exit status
 - Exporters/monitoring: enumerate units and read structured properties (Unit/Service/Socket/Timer) over D-Bus
+- Traditional deployments: generate/install systemd service unit files and manage drop-ins (feature=`config`)
 
 ## Requirements
 
@@ -37,7 +38,7 @@ platforms, but most operations will fail with `Error::BackendUnavailable`.
 - Optional runtime: `rt-tokio` (mutually exclusive with `rt-async-io`)
 - Default: `journal-sdjournal` (pure Rust journald backend, no `journalctl` subprocess)
 - Optional: `journal-cli` (journald via `journalctl --output=json`)
-- Optional: `config` (drop-in management)
+- Optional: `config` (systemd config: unit files + drop-ins)
 - Optional: `tasks` (transient tasks via `StartTransientUnit`)
 - Optional: `tracing` (instrumentation via `tracing`)
 - Optional: `observe` (watch unit failures via D-Bus signals)
@@ -84,6 +85,7 @@ async fn restart_nginx() -> Result<(), unitbus::Error> {
 - `examples/fetch_recent_logs.rs`
 - `examples/diagnose_on_failure.rs`
 - `examples/list_units_and_properties.rs`
+- `examples/render_service_unit.rs`
 - `examples/run_transient_task.rs` (requires `--features tasks`)
 - `examples/observe_unit_failure.rs` (requires `--features observe`)
 - `examples/blocking_restart_and_wait.rs` (requires `--features blocking`)

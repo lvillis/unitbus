@@ -23,7 +23,7 @@ pub(crate) async fn probe(bus: &crate::UnitBus) -> Capabilities {
     let can_write_dropins = {
         #[cfg(feature = "config")]
         {
-            probe_write_dropins()
+            probe_write_dropins(&bus.inner.opts.systemd_system_dir)
         }
 
         #[cfg(not(feature = "config"))]
@@ -72,10 +72,10 @@ async fn probe_control_units(bus: &crate::UnitBus) -> bool {
 }
 
 #[cfg(feature = "config")]
-fn probe_write_dropins() -> bool {
+fn probe_write_dropins(_systemd_system_dir: &str) -> bool {
     #[cfg(unix)]
     {
-        probe_write_dropins_unix()
+        probe_write_dropins_unix(_systemd_system_dir)
     }
 
     #[cfg(not(unix))]
@@ -85,16 +85,14 @@ fn probe_write_dropins() -> bool {
 }
 
 #[cfg(all(unix, feature = "config"))]
-fn probe_write_dropins_unix() -> bool {
+fn probe_write_dropins_unix(path: &str) -> bool {
     use std::os::unix::fs::MetadataExt;
 
-    const PATH: &str = "/etc/systemd/system";
-
-    if is_mount_read_only(PATH) {
+    if is_mount_read_only(path) {
         return false;
     }
 
-    let meta = match std::fs::metadata(PATH) {
+    let meta = match std::fs::metadata(path) {
         Ok(m) => m,
         Err(_) => return false,
     };

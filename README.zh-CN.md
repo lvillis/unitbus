@@ -14,6 +14,7 @@
 - 故障诊断：失败时获取 unit 状态 + 最近关键日志切片（有上限，避免拉爆日志）
 - 部署任务：用 transient unit 运行一次性命令并拿到 exit status
 - Exporter/监控：枚举全部 unit，并按类型读取 properties（Unit/Service/Socket/Timer）用于指标采集
+- 传统部署：生成/安装 systemd service unit 文件，并管理 drop-in（feature=`config`）
 
 ## 环境要求
 
@@ -34,7 +35,7 @@
 - 可选运行时：`rt-tokio`（与 `rt-async-io` 互斥）
 - 默认：`journal-sdjournal`（纯 Rust journald 后端，不依赖 `journalctl` 子进程）
 - 可选：`journal-cli`（通过 `journalctl --output=json` 读取 journald）
-- 可选：`config`（drop-in 配置管理）
+- 可选：`config`（systemd 配置：unit 文件 + drop-in）
 - 可选：`tasks`（通过 `StartTransientUnit` 执行 transient task）
 - 可选：`tracing`（通过 `tracing` 增强可观测性）
 - 可选：`observe`（通过 D-Bus 信号观察 unit 失败事件）
@@ -81,6 +82,7 @@ async fn restart_nginx() -> Result<(), unitbus::Error> {
 - `examples/fetch_recent_logs.rs`
 - `examples/diagnose_on_failure.rs`
 - `examples/list_units_and_properties.rs`
+- `examples/render_service_unit.rs`
 - `examples/run_transient_task.rs`（需要 `--features tasks`）
 - `examples/observe_unit_failure.rs`（需要 `--features observe`）
 - `examples/blocking_restart_and_wait.rs`（需要 `--features blocking`）

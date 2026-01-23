@@ -26,6 +26,13 @@ pub(crate) type ListUnitItem = (
     OwnedObjectPath,
 );
 
+#[cfg(feature = "config")]
+pub(crate) type UnitFileChangeItem = (String, String, String);
+#[cfg(feature = "config")]
+pub(crate) type UnitFileChanges = Vec<UnitFileChangeItem>;
+#[cfg(feature = "config")]
+pub(crate) type EnableUnitFilesReply = (bool, UnitFileChanges);
+
 #[derive(Debug)]
 pub(crate) struct Bus {
     conn: zbus::Connection,
@@ -122,6 +129,39 @@ impl Bus {
             .await
             .map_err(|e| {
                 map_zbus_method_error("list_units_filtered", self.dbus_call_timeout, e, None)
+            })
+    }
+
+    #[cfg(feature = "config")]
+    pub(crate) async fn enable_unit_files(
+        &self,
+        files: &[String],
+        runtime: bool,
+        force: bool,
+    ) -> Result<EnableUnitFilesReply> {
+        let proxy = self.manager_proxy().await?;
+        let files: Vec<&str> = files.iter().map(|s| s.as_str()).collect();
+        proxy
+            .call("EnableUnitFiles", &(files, runtime, force))
+            .await
+            .map_err(|e| {
+                map_zbus_method_error("enable_unit_files", self.dbus_call_timeout, e, None)
+            })
+    }
+
+    #[cfg(feature = "config")]
+    pub(crate) async fn disable_unit_files(
+        &self,
+        files: &[String],
+        runtime: bool,
+    ) -> Result<UnitFileChanges> {
+        let proxy = self.manager_proxy().await?;
+        let files: Vec<&str> = files.iter().map(|s| s.as_str()).collect();
+        proxy
+            .call("DisableUnitFiles", &(files, runtime))
+            .await
+            .map_err(|e| {
+                map_zbus_method_error("disable_unit_files", self.dbus_call_timeout, e, None)
             })
     }
 
