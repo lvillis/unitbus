@@ -1,8 +1,21 @@
+## [0.1.6] - 2026-01-23
+
+### 🚀 Features
+
+- Add manager APIs and unit properties
+
+### ⚙️ Miscellaneous Tasks
+
+- *(ci)* Update
 ## [0.1.5] - 2026-01-03
 
 ### 🐛 Bug Fixes
 
 - *(journal/sdjournal)* Correct unit match OR grouping (DNF)
+
+### ⚙️ Miscellaneous Tasks
+
+- Release unitbus version 0.1.5
 ## [0.1.4] - 2026-01-03
 
 ### 🚀 Features
