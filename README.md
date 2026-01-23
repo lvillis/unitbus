@@ -16,6 +16,7 @@ platforms, but most operations will fail with `Error::BackendUnavailable`.
 - CD/agent: restart a service and wait for a clear outcome (success/failed/timeout)
 - Troubleshooting: get unit status + a bounded slice of recent logs on failure
 - Deployment tasks: run one-shot commands as transient units and collect exit status
+- Exporters/monitoring: enumerate units and read structured properties (Unit/Service/Socket/Timer) over D-Bus
 
 ## Requirements
 
@@ -82,6 +83,7 @@ async fn restart_nginx() -> Result<(), unitbus::Error> {
 - `examples/restart_and_wait.rs`
 - `examples/fetch_recent_logs.rs`
 - `examples/diagnose_on_failure.rs`
+- `examples/list_units_and_properties.rs`
 - `examples/run_transient_task.rs` (requires `--features tasks`)
 - `examples/observe_unit_failure.rs` (requires `--features observe`)
 - `examples/blocking_restart_and_wait.rs` (requires `--features blocking`)

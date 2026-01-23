@@ -2,7 +2,7 @@
 name = "unitbus"
 version = "0.1.5"
 edition = "2024"
-rust-version = "1.92.0"
+rust-version = "1.93.0"
 license = "MIT"
 description = "Rust SDK for Linux systemd: control units/jobs via D-Bus (systemctl-like), run transient tasks, and query journald logs (sdjournal default, optional journalctl JSON)."
 readme = "README.md"

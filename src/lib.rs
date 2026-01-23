@@ -60,6 +60,7 @@ mod error;
 #[cfg(feature = "config")]
 mod fsutil;
 mod journal;
+mod manager;
 #[cfg(feature = "observe")]
 mod observe;
 mod options;
@@ -74,6 +75,8 @@ pub use crate::types::journal::{
     Diagnosis, DiagnosisOptions, JournalCursor, JournalEntry, JournalFilter, JournalResult,
     JournalStats, ParseErrorMode,
 };
+pub use crate::types::manager::{ManagerInfo, UnitListEntry};
+pub use crate::types::properties::Properties;
 #[cfg(feature = "tasks")]
 pub use crate::types::task::{TaskHandle, TaskResult, TaskSpec};
 pub use crate::types::unit::{
@@ -85,7 +88,9 @@ pub use crate::error::{Error, Result};
 pub use crate::options::UnitBusOptions;
 
 #[cfg(feature = "blocking")]
-pub use crate::blocking_api::{BlockingJobHandle, BlockingJournal, BlockingUnitBus, BlockingUnits};
+pub use crate::blocking_api::{
+    BlockingJobHandle, BlockingJournal, BlockingManager, BlockingUnitBus, BlockingUnits,
+};
 
 #[cfg(all(feature = "blocking", feature = "tasks"))]
 pub use crate::blocking_api::{BlockingTaskHandle, BlockingTasks};
@@ -94,6 +99,7 @@ pub use crate::blocking_api::{BlockingTaskHandle, BlockingTasks};
 pub use crate::blocking_api::BlockingConfig;
 
 pub use crate::journal::Journal;
+pub use crate::manager::Manager;
 #[cfg(feature = "observe")]
 pub use crate::observe::{Observe, ObserveOptions, UnitFailedEvent, UnitFailureWatcher};
 #[cfg(feature = "config")]
@@ -143,6 +149,11 @@ impl UnitBus {
     /// Access journald APIs.
     pub fn journal(&self) -> Journal {
         Journal::new(self.inner.clone())
+    }
+
+    /// Access systemd manager/global APIs.
+    pub fn manager(&self) -> Manager {
+        Manager::new(self.inner.clone())
     }
 
     /// Access observe APIs (feature=`observe`).

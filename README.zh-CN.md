@@ -13,6 +13,7 @@
 - CD/Agent：restart 某个 service，并在超时内拿到明确结果（成功/失败/超时）
 - 故障诊断：失败时获取 unit 状态 + 最近关键日志切片（有上限，避免拉爆日志）
 - 部署任务：用 transient unit 运行一次性命令并拿到 exit status
+- Exporter/监控：枚举全部 unit，并按类型读取 properties（Unit/Service/Socket/Timer）用于指标采集
 
 ## 环境要求
 
@@ -79,6 +80,7 @@ async fn restart_nginx() -> Result<(), unitbus::Error> {
 - `examples/restart_and_wait.rs`
 - `examples/fetch_recent_logs.rs`
 - `examples/diagnose_on_failure.rs`
+- `examples/list_units_and_properties.rs`
 - `examples/run_transient_task.rs`（需要 `--features tasks`）
 - `examples/observe_unit_failure.rs`（需要 `--features observe`）
 - `examples/blocking_restart_and_wait.rs`（需要 `--features blocking`）

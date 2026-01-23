@@ -9,6 +9,8 @@ use zbus::zvariant::{OwnedObjectPath, OwnedValue};
 
 const SYSTEMD_UNIT_INTERFACE: &str = "org.freedesktop.systemd1.Unit";
 const SYSTEMD_SERVICE_INTERFACE: &str = "org.freedesktop.systemd1.Service";
+const SYSTEMD_SOCKET_INTERFACE: &str = "org.freedesktop.systemd1.Socket";
+const SYSTEMD_TIMER_INTERFACE: &str = "org.freedesktop.systemd1.Timer";
 
 #[cfg(feature = "tasks")]
 static TRANSIENT_COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
@@ -22,6 +24,107 @@ pub struct Units {
 impl Units {
     pub(crate) fn new(inner: Arc<crate::Inner>) -> Self {
         Self { inner }
+    }
+
+    /// Fetch `org.freedesktop.systemd1.Unit` properties via D-Bus `GetAll`.
+    ///
+    /// `unit` is canonicalized (e.g. `"nginx"` becomes `"nginx.service"`).
+    pub async fn get_unit_properties(&self, unit: &str) -> Result<crate::Properties> {
+        let unit = util::canonicalize_unit_name(unit)?;
+        let unit_path = self.inner.bus.get_unit_path(&unit).await?;
+        self.get_unit_properties_by_path(unit_path.as_str()).await
+    }
+
+    /// Fetch `org.freedesktop.systemd1.Unit` properties via D-Bus `GetAll` by object path.
+    pub async fn get_unit_properties_by_path(&self, unit_path: &str) -> Result<crate::Properties> {
+        util::validate_no_control("unit path", unit_path)?;
+        if unit_path.trim().is_empty() {
+            return Err(Error::invalid_input("unit_path must not be empty"));
+        }
+
+        let props = self
+            .inner
+            .bus
+            .get_all_properties(unit_path, SYSTEMD_UNIT_INTERFACE)
+            .await?;
+        Ok(crate::Properties::from_dbus(props))
+    }
+
+    /// Fetch `org.freedesktop.systemd1.Service` properties via D-Bus `GetAll`.
+    ///
+    /// Returns `Ok(None)` when the unit is not a service (or the interface is missing).
+    pub async fn get_service_properties(&self, unit: &str) -> Result<Option<crate::Properties>> {
+        let unit = util::canonicalize_unit_name(unit)?;
+        let unit_path = self.inner.bus.get_unit_path(&unit).await?;
+        self.get_service_properties_by_path(unit_path.as_str())
+            .await
+    }
+
+    /// Fetch `org.freedesktop.systemd1.Service` properties via D-Bus `GetAll` by object path.
+    pub async fn get_service_properties_by_path(
+        &self,
+        unit_path: &str,
+    ) -> Result<Option<crate::Properties>> {
+        self.get_optional_properties_by_path(unit_path, SYSTEMD_SERVICE_INTERFACE)
+            .await
+    }
+
+    /// Fetch `org.freedesktop.systemd1.Socket` properties via D-Bus `GetAll`.
+    ///
+    /// Returns `Ok(None)` when the unit is not a socket (or the interface is missing).
+    pub async fn get_socket_properties(&self, unit: &str) -> Result<Option<crate::Properties>> {
+        let unit = util::canonicalize_unit_name(unit)?;
+        let unit_path = self.inner.bus.get_unit_path(&unit).await?;
+        self.get_socket_properties_by_path(unit_path.as_str()).await
+    }
+
+    /// Fetch `org.freedesktop.systemd1.Socket` properties via D-Bus `GetAll` by object path.
+    pub async fn get_socket_properties_by_path(
+        &self,
+        unit_path: &str,
+    ) -> Result<Option<crate::Properties>> {
+        self.get_optional_properties_by_path(unit_path, SYSTEMD_SOCKET_INTERFACE)
+            .await
+    }
+
+    /// Fetch `org.freedesktop.systemd1.Timer` properties via D-Bus `GetAll`.
+    ///
+    /// Returns `Ok(None)` when the unit is not a timer (or the interface is missing).
+    pub async fn get_timer_properties(&self, unit: &str) -> Result<Option<crate::Properties>> {
+        let unit = util::canonicalize_unit_name(unit)?;
+        let unit_path = self.inner.bus.get_unit_path(&unit).await?;
+        self.get_timer_properties_by_path(unit_path.as_str()).await
+    }
+
+    /// Fetch `org.freedesktop.systemd1.Timer` properties via D-Bus `GetAll` by object path.
+    pub async fn get_timer_properties_by_path(
+        &self,
+        unit_path: &str,
+    ) -> Result<Option<crate::Properties>> {
+        self.get_optional_properties_by_path(unit_path, SYSTEMD_TIMER_INTERFACE)
+            .await
+    }
+
+    async fn get_optional_properties_by_path(
+        &self,
+        unit_path: &str,
+        interface: &str,
+    ) -> Result<Option<crate::Properties>> {
+        util::validate_no_control("unit path", unit_path)?;
+        if unit_path.trim().is_empty() {
+            return Err(Error::invalid_input("unit_path must not be empty"));
+        }
+
+        match self
+            .inner
+            .bus
+            .get_all_properties(unit_path, interface)
+            .await
+        {
+            Ok(props) => Ok(Some(crate::Properties::from_dbus(props))),
+            Err(Error::DbusError { name, .. }) if name.contains("UnknownInterface") => Ok(None),
+            Err(e) => Err(e),
+        }
     }
 
     /// Fetch a snapshot of unit status via D-Bus.

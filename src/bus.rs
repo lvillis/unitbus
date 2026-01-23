@@ -13,6 +13,19 @@ pub(crate) const DBUS_PROPERTIES_INTERFACE: &str = "org.freedesktop.DBus.Propert
 
 const SYSTEMD_JOB_INTERFACE: &str = "org.freedesktop.systemd1.Job";
 
+pub(crate) type ListUnitItem = (
+    String,
+    String,
+    String,
+    String,
+    String,
+    String,
+    OwnedObjectPath,
+    u32,
+    String,
+    OwnedObjectPath,
+);
+
 #[derive(Debug)]
 pub(crate) struct Bus {
     conn: zbus::Connection,
@@ -92,6 +105,24 @@ impl Bus {
         proxy.call("ReloadUnit", &(unit, mode)).await.map_err(|e| {
             map_zbus_method_error("reload_unit", self.dbus_call_timeout, e, Some(unit))
         })
+    }
+
+    pub(crate) async fn list_units(&self) -> Result<Vec<ListUnitItem>> {
+        let proxy = self.manager_proxy().await?;
+        proxy
+            .call("ListUnits", &())
+            .await
+            .map_err(|e| map_zbus_method_error("list_units", self.dbus_call_timeout, e, None))
+    }
+
+    pub(crate) async fn list_units_filtered(&self, states: &[&str]) -> Result<Vec<ListUnitItem>> {
+        let proxy = self.manager_proxy().await?;
+        proxy
+            .call("ListUnitsFiltered", &(states))
+            .await
+            .map_err(|e| {
+                map_zbus_method_error("list_units_filtered", self.dbus_call_timeout, e, None)
+            })
     }
 
     #[cfg(feature = "tasks")]

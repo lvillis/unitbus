@@ -31,6 +31,138 @@ fn env(name: &str) -> Option<String> {
     }
 }
 
+#[test]
+#[ignore]
+fn manager_list_units_and_info_read_only() {
+    block_on(async {
+        let bus = UnitBus::connect_system().await?;
+
+        let units = match bus.manager().list_units().await {
+            Ok(v) => v,
+            Err(unitbus::Error::PermissionDenied { .. }) => {
+                eprintln!("permission denied; skipping manager list_units");
+                return Ok(());
+            }
+            Err(unitbus::Error::BackendUnavailable { .. }) => {
+                eprintln!("system bus/systemd unavailable; skipping manager list_units");
+                return Ok(());
+            }
+            Err(e) => return Err(e),
+        };
+
+        assert!(!units.is_empty(), "expected at least one unit");
+        for u in units.iter().take(50) {
+            assert!(!u.name.trim().is_empty(), "unit name must not be empty");
+            assert!(
+                u.unit_path.starts_with("/org/freedesktop/systemd1/unit/"),
+                "unexpected unit path: {}",
+                u.unit_path
+            );
+
+            if u.job_id.is_some() {
+                assert!(
+                    u.job_path.is_some(),
+                    "job_path should exist when job_id exists"
+                );
+            }
+        }
+
+        let info = match bus.manager().info().await {
+            Ok(i) => i,
+            Err(unitbus::Error::PermissionDenied { .. }) => {
+                eprintln!("permission denied; skipping manager info");
+                return Ok(());
+            }
+            Err(unitbus::Error::BackendUnavailable { .. }) => {
+                eprintln!("system bus/systemd unavailable; skipping manager info");
+                return Ok(());
+            }
+            Err(e) => return Err(e),
+        };
+
+        assert!(
+            info.system_state.is_some() || info.version.is_some() || info.virtualization.is_some(),
+            "expected at least one manager info field"
+        );
+
+        Ok::<(), unitbus::Error>(())
+    })
+    .unwrap();
+}
+
+#[test]
+#[ignore]
+fn manager_list_units_filtered_active_only_contains_active() {
+    block_on(async {
+        let bus = UnitBus::connect_system().await?;
+
+        let units = match bus.manager().list_units_filtered(&["active"]).await {
+            Ok(v) => v,
+            Err(unitbus::Error::PermissionDenied { .. }) => {
+                eprintln!("permission denied; skipping list_units_filtered");
+                return Ok(());
+            }
+            Err(unitbus::Error::BackendUnavailable { .. }) => {
+                eprintln!("system bus/systemd unavailable; skipping list_units_filtered");
+                return Ok(());
+            }
+            Err(e) => return Err(e),
+        };
+
+        for u in units {
+            assert_eq!(
+                u.active_state.as_str(),
+                "active",
+                "expected only active units"
+            );
+        }
+
+        Ok::<(), unitbus::Error>(())
+    })
+    .unwrap();
+}
+
+#[test]
+#[ignore]
+fn can_read_unit_properties_by_path_read_only() {
+    block_on(async {
+        let bus = UnitBus::connect_system().await?;
+
+        let units = match bus.manager().list_units().await {
+            Ok(v) => v,
+            Err(unitbus::Error::PermissionDenied { .. }) => {
+                eprintln!("permission denied; skipping");
+                return Ok(());
+            }
+            Err(unitbus::Error::BackendUnavailable { .. }) => {
+                eprintln!("system bus/systemd unavailable; skipping");
+                return Ok(());
+            }
+            Err(e) => return Err(e),
+        };
+
+        let Some(u) = units.first() else {
+            return Ok(());
+        };
+
+        let props = bus
+            .units()
+            .get_unit_properties_by_path(&u.unit_path)
+            .await?;
+        let id = props.get_opt_str("Id").unwrap_or("");
+        assert!(!id.is_empty(), "expected Unit.Id to be present");
+
+        // Only a best-effort check: non-service units return None.
+        let _service_props = bus
+            .units()
+            .get_service_properties_by_path(&u.unit_path)
+            .await?;
+
+        Ok::<(), unitbus::Error>(())
+    })
+    .unwrap();
+}
+
 #[cfg(all(
     feature = "tasks",
     any(feature = "journal-cli", feature = "journal-sdjournal")

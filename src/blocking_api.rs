@@ -1,6 +1,7 @@
 use crate::{
     Capabilities, Diagnosis, DiagnosisOptions, JobHandle, JobOutcome, Journal, JournalFilter,
-    JournalResult, Result, UnitBus, UnitBusOptions, UnitStartMode, UnitStatus, Units,
+    JournalResult, Manager, ManagerInfo, Properties, Result, UnitBus, UnitBusOptions,
+    UnitListEntry, UnitStartMode, UnitStatus, Units,
 };
 
 use std::time::Duration;
@@ -47,6 +48,13 @@ impl BlockingUnitBus {
         }
     }
 
+    /// Access systemd manager/global APIs (blocking wrappers).
+    pub fn manager(&self) -> BlockingManager {
+        BlockingManager {
+            inner: self.inner.manager(),
+        }
+    }
+
     /// Access transient task APIs (blocking wrappers).
     #[cfg(feature = "tasks")]
     pub fn tasks(&self) -> BlockingTasks {
@@ -71,6 +79,38 @@ pub struct BlockingUnits {
 }
 
 impl BlockingUnits {
+    pub fn get_unit_properties(&self, unit: &str) -> Result<Properties> {
+        crate::runtime::block_on_result(self.inner.get_unit_properties(unit))
+    }
+
+    pub fn get_unit_properties_by_path(&self, unit_path: &str) -> Result<Properties> {
+        crate::runtime::block_on_result(self.inner.get_unit_properties_by_path(unit_path))
+    }
+
+    pub fn get_service_properties(&self, unit: &str) -> Result<Option<Properties>> {
+        crate::runtime::block_on_result(self.inner.get_service_properties(unit))
+    }
+
+    pub fn get_service_properties_by_path(&self, unit_path: &str) -> Result<Option<Properties>> {
+        crate::runtime::block_on_result(self.inner.get_service_properties_by_path(unit_path))
+    }
+
+    pub fn get_socket_properties(&self, unit: &str) -> Result<Option<Properties>> {
+        crate::runtime::block_on_result(self.inner.get_socket_properties(unit))
+    }
+
+    pub fn get_socket_properties_by_path(&self, unit_path: &str) -> Result<Option<Properties>> {
+        crate::runtime::block_on_result(self.inner.get_socket_properties_by_path(unit_path))
+    }
+
+    pub fn get_timer_properties(&self, unit: &str) -> Result<Option<Properties>> {
+        crate::runtime::block_on_result(self.inner.get_timer_properties(unit))
+    }
+
+    pub fn get_timer_properties_by_path(&self, unit_path: &str) -> Result<Option<Properties>> {
+        crate::runtime::block_on_result(self.inner.get_timer_properties_by_path(unit_path))
+    }
+
     pub fn get_status(&self, unit: &str) -> Result<UnitStatus> {
         crate::runtime::block_on_result(self.inner.get_status(unit))
     }
@@ -129,6 +169,30 @@ impl BlockingJournal {
 
     pub fn diagnose_unit_failure(&self, unit: &str, opts: DiagnosisOptions) -> Result<Diagnosis> {
         crate::runtime::block_on_result(self.inner.diagnose_unit_failure(unit, opts))
+    }
+}
+
+/// Blocking wrapper for `Manager`.
+#[derive(Clone, Debug)]
+pub struct BlockingManager {
+    inner: Manager,
+}
+
+impl BlockingManager {
+    pub fn list_units(&self) -> Result<Vec<UnitListEntry>> {
+        crate::runtime::block_on_result(self.inner.list_units())
+    }
+
+    pub fn list_units_filtered(&self, states: &[&str]) -> Result<Vec<UnitListEntry>> {
+        crate::runtime::block_on_result(self.inner.list_units_filtered(states))
+    }
+
+    pub fn properties(&self) -> Result<Properties> {
+        crate::runtime::block_on_result(self.inner.properties())
+    }
+
+    pub fn info(&self) -> Result<ManagerInfo> {
+        crate::runtime::block_on_result(self.inner.info())
     }
 }
 

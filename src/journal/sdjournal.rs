@@ -43,23 +43,22 @@ pub(crate) async fn query_sdjournal(
     let max_message_bytes = filter.max_message_bytes;
     let parse_error = filter.parse_error;
 
-    blocking::unblock(move || {
-        query_sdjournal_sync(
-            unit,
-            since_realtime,
-            until_realtime,
-            after_cursor,
-            limit,
-            max_bytes,
-            max_message_bytes,
-            timeout,
-            parse_error,
-        )
-    })
-    .await
+    let args = SdJournalQueryArgs {
+        unit,
+        since_realtime,
+        until_realtime,
+        after_cursor,
+        limit,
+        max_bytes,
+        max_message_bytes,
+        timeout,
+        parse_error,
+    };
+
+    blocking::unblock(move || query_sdjournal_sync(args)).await
 }
 
-fn query_sdjournal_sync(
+struct SdJournalQueryArgs {
     unit: Option<String>,
     since_realtime: Option<u64>,
     until_realtime: Option<u64>,
@@ -69,7 +68,20 @@ fn query_sdjournal_sync(
     max_message_bytes: u32,
     timeout: Duration,
     parse_error: ParseErrorMode,
-) -> Result<JournalResult> {
+}
+
+fn query_sdjournal_sync(args: SdJournalQueryArgs) -> Result<JournalResult> {
+    let SdJournalQueryArgs {
+        unit,
+        since_realtime,
+        until_realtime,
+        after_cursor,
+        limit,
+        max_bytes,
+        max_message_bytes,
+        timeout,
+        parse_error,
+    } = args;
     let mut stats = JournalStats::default();
     let mut entries: Vec<JournalEntry> = Vec::new();
     let mut truncated = false;

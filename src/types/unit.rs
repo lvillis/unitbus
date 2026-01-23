@@ -57,6 +57,22 @@ impl LoadState {
             other => LoadState::Unknown(other.to_string()),
         }
     }
+
+    /// Return the original systemd string representation (e.g. `"loaded"`).
+    pub fn as_str(&self) -> &str {
+        match self {
+            LoadState::Loaded => "loaded",
+            LoadState::NotFound => "not-found",
+            LoadState::Error => "error",
+            LoadState::Masked => "masked",
+            LoadState::Stub => "stub",
+            LoadState::Merged => "merged",
+            LoadState::Generated => "generated",
+            LoadState::Transient => "transient",
+            LoadState::BadSetting => "bad-setting",
+            LoadState::Unknown(s) => s.as_str(),
+        }
+    }
 }
 
 /// systemd `Unit.ActiveState`.
@@ -84,6 +100,20 @@ impl ActiveState {
             "deactivating" => ActiveState::Deactivating,
             "maintenance" => ActiveState::Maintenance,
             other => ActiveState::Unknown(other.to_string()),
+        }
+    }
+
+    /// Return the original systemd string representation (e.g. `"active"`).
+    pub fn as_str(&self) -> &str {
+        match self {
+            ActiveState::Active => "active",
+            ActiveState::Reloading => "reloading",
+            ActiveState::Inactive => "inactive",
+            ActiveState::Failed => "failed",
+            ActiveState::Activating => "activating",
+            ActiveState::Deactivating => "deactivating",
+            ActiveState::Maintenance => "maintenance",
+            ActiveState::Unknown(s) => s.as_str(),
         }
     }
 }
@@ -207,5 +237,19 @@ mod tests {
             ActiveState::parse("wat"),
             ActiveState::Unknown("wat".to_string())
         );
+    }
+
+    #[test]
+    fn load_state_as_str_matches_parse_inputs() {
+        assert_eq!(LoadState::Loaded.as_str(), "loaded");
+        assert_eq!(LoadState::NotFound.as_str(), "not-found");
+        assert_eq!(LoadState::Unknown("wat".to_string()).as_str(), "wat");
+    }
+
+    #[test]
+    fn active_state_as_str_matches_parse_inputs() {
+        assert_eq!(ActiveState::Active.as_str(), "active");
+        assert_eq!(ActiveState::Inactive.as_str(), "inactive");
+        assert_eq!(ActiveState::Unknown("wat".to_string()).as_str(), "wat");
     }
 }
