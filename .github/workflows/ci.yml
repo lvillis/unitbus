@@ -8,7 +8,7 @@ jobs:
   fmt:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.93.0
@@ -24,7 +24,7 @@ jobs:
           - "--no-default-features --features rt-async-io,journal-sdjournal,journal-cli,config,tasks,observe,blocking,tracing"
           - "--no-default-features --features rt-tokio,journal-sdjournal,journal-cli,config,tasks,observe,blocking,tracing"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.93.0
@@ -51,7 +51,7 @@ jobs:
           - "--no-default-features --features rt-async-io,journal-sdjournal,config,tasks,observe,blocking,tracing"
           - "--no-default-features --features rt-tokio,journal-sdjournal,config,tasks,observe,blocking,tracing"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.93.0
@@ -67,7 +67,7 @@ jobs:
           - "--no-default-features --features rt-async-io,journal-sdjournal,journal-cli,config,tasks,observe,blocking,tracing"
           - "--no-default-features --features rt-tokio,journal-sdjournal,journal-cli,config,tasks,observe,blocking,tracing"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.93.0
@@ -76,7 +76,7 @@ jobs:
   package:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.93.0
