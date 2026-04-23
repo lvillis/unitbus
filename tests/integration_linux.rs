@@ -31,6 +31,13 @@ fn env(name: &str) -> Option<String> {
     }
 }
 
+#[cfg(any(
+    feature = "config",
+    all(
+        feature = "tasks",
+        any(feature = "journal-cli", feature = "journal-sdjournal")
+    )
+))]
 fn find_executable(candidates: &[&str]) -> Option<String> {
     for c in candidates {
         if std::path::Path::new(c).exists() {

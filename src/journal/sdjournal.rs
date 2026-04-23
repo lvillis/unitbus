@@ -1,3 +1,4 @@
+use super::{JournalQueryMode, finalize_query_result, validate_query_filter};
 use crate::types::journal::{
     JournalEntry, JournalFilter, JournalResult, JournalStats, ParseErrorMode,
 };
@@ -11,6 +12,8 @@ pub(crate) async fn query_sdjournal(
     filter: JournalFilter,
 ) -> Result<JournalResult> {
     let mut filter = filter;
+    validate_query_filter(&filter)?;
+    let mode = JournalQueryMode::from_filter(&filter);
     let timeout = filter
         .timeout
         .take()
@@ -53,6 +56,7 @@ pub(crate) async fn query_sdjournal(
         max_message_bytes,
         timeout,
         parse_error,
+        mode,
     };
 
     blocking::unblock(move || query_sdjournal_sync(args)).await
@@ -68,6 +72,7 @@ struct SdJournalQueryArgs {
     max_message_bytes: u32,
     timeout: Duration,
     parse_error: ParseErrorMode,
+    mode: JournalQueryMode,
 }
 
 fn query_sdjournal_sync(args: SdJournalQueryArgs) -> Result<JournalResult> {
@@ -81,6 +86,7 @@ fn query_sdjournal_sync(args: SdJournalQueryArgs) -> Result<JournalResult> {
         max_message_bytes,
         timeout,
         parse_error,
+        mode,
     } = args;
     let mut stats = JournalStats::default();
     let mut entries: Vec<JournalEntry> = Vec::new();
@@ -93,15 +99,7 @@ fn query_sdjournal_sync(args: SdJournalQueryArgs) -> Result<JournalResult> {
     let mut q = journal.query();
 
     if let Some(unit) = &unit {
-        q.or_group(|g| {
-            g.match_exact("_SYSTEMD_UNIT", unit.as_bytes());
-        });
-        q.or_group(|g| {
-            g.match_exact("UNIT", unit.as_bytes());
-        });
-        q.or_group(|g| {
-            g.match_exact("OBJECT_SYSTEMD_UNIT", unit.as_bytes());
-        });
+        q.match_unit(unit);
     }
     if let Some(us) = since_realtime {
         q.since_realtime(us);
@@ -111,6 +109,8 @@ fn query_sdjournal_sync(args: SdJournalQueryArgs) -> Result<JournalResult> {
     }
     if let Some(c) = after_cursor {
         q.after_cursor(c);
+    } else if mode.collect_newest_first() {
+        q.seek_tail();
     }
 
     let want = usize::try_from(limit).unwrap_or(usize::MAX);
@@ -207,14 +207,7 @@ fn query_sdjournal_sync(args: SdJournalQueryArgs) -> Result<JournalResult> {
         });
     }
 
-    let next_cursor = entries.last().and_then(|e| e.cursor.clone());
-
-    Ok(JournalResult {
-        entries,
-        next_cursor,
-        truncated,
-        stats,
-    })
+    Ok(finalize_query_result(entries, truncated, stats, mode))
 }
 
 fn parse_cursor(input: &str) -> Result<sdjournal::Cursor> {

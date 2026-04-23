@@ -1,3 +1,4 @@
+use super::{JournalQueryMode, finalize_query_result, validate_query_filter};
 use crate::types::journal::{
     JournalEntry, JournalFilter, JournalResult, JournalStats, ParseErrorMode,
 };
@@ -15,23 +16,11 @@ pub(crate) async fn query_journalctl(
     opts: &UnitBusOptions,
     mut filter: JournalFilter,
 ) -> Result<JournalResult> {
-    if filter.limit == 0 {
-        return Err(Error::invalid_input("journal limit must be > 0"));
-    }
-    if filter.max_bytes == 0 {
-        return Err(Error::invalid_input("journal max_bytes must be > 0"));
-    }
-    if filter.max_message_bytes == 0 {
-        return Err(Error::invalid_input(
-            "journal max_message_bytes must be > 0",
-        ));
-    }
+    validate_query_filter(&filter)?;
+    let mode = JournalQueryMode::from_filter(&filter);
 
     if let Some(unit) = &filter.unit {
         filter.unit = Some(util::canonicalize_unit_name(unit)?);
-    }
-    if let Some(cursor) = &filter.after_cursor {
-        util::validate_no_control("cursor", cursor)?;
     }
 
     let timeout = filter.timeout.unwrap_or(opts.journal_default_timeout);
@@ -52,6 +41,9 @@ pub(crate) async fn query_journalctl(
 
     let mut cmd = async_process::Command::new("journalctl");
     cmd.arg("--no-pager").arg("--output=json");
+    if mode.collect_newest_first() {
+        cmd.arg("--reverse");
+    }
 
     if let Some(unit) = &filter.unit {
         cmd.arg("-u").arg(unit);
@@ -205,15 +197,12 @@ pub(crate) async fn query_journalctl(
         "journalctl result"
     );
 
-    let entries = collector.entries;
-    let next_cursor = entries.last().and_then(|e| e.cursor.clone());
-
-    Ok(JournalResult {
-        entries,
-        next_cursor,
-        truncated: collector.truncated,
-        stats: collector.stats,
-    })
+    Ok(finalize_query_result(
+        collector.entries,
+        collector.truncated,
+        collector.stats,
+        mode,
+    ))
 }
 
 async fn drain_to_end_limited(
