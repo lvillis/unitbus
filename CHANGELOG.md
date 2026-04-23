@@ -3,6 +3,10 @@
 ### 🚀 Features
 
 - *(config)* Manage service unit files
+
+### ⚙️ Miscellaneous Tasks
+
+- Release unitbus version 0.1.7
 ## [0.1.6] - 2026-01-23
 
 ### 🚀 Features
@@ -15,31 +19,20 @@
 - Release unitbus version 0.1.6
 ## [0.1.5] - 2026-01-03
 
-### 🐛 Bug Fixes
-
-- *(journal/sdjournal)* Correct unit match OR grouping (DNF)
-
-### ⚙️ Miscellaneous Tasks
-
-- Release unitbus version 0.1.5
-## [0.1.4] - 2026-01-03
-
 ### 🚀 Features
 
 - *(rt)* Add rt-tokio option and runtime abstraction (no async-io mixing)
 
-### ⚙️ Miscellaneous Tasks
-
-- Release unitbus version 0.1.4
-## [0.1.3] - 2026-01-03
-
 ### 🐛 Bug Fixes
 
 - *(journal)* Handle non-string MESSAGE and widen unit match
+- *(journal/sdjournal)* Correct unit match OR grouping (DNF)
 
 ### ⚙️ Miscellaneous Tasks
 
 - Release unitbus version 0.1.3
+- Release unitbus version 0.1.4
+- Release unitbus version 0.1.5
 ## [0.1.2] - 2026-01-03
 
 ### 🚀 Features
